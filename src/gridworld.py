@@ -229,7 +229,8 @@ class GridWorld:
                     self.state_actions.append(actions)
 
 
-grid1 = [
+grid1 = \
+[
     ['', '', '', 1],
     ['', 'x', '', -1],
     ['', '', '', '']
