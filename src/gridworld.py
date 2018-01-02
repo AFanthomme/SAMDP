@@ -4,13 +4,15 @@ import numbers
 import gridrender as gui
 from tkinter import Tk
 import tkinter.font as tkfont
+import time
 
 MDP = namedtuple('MDP', 'S,A,P,R,gamma,d0')
 
 
 class GridWorld:
-    def __init__(self, gamma=0.95, grid=None, render=False):
+    def __init__(self, gamma=0.95, grid=None, render=False, time_penalty=0.1):
         self.grid = grid
+        self.time_penalty = time_penalty
         self.action_names = np.array(['right', 'down', 'left', 'up'])
 
         self.n_rows, self.n_cols = len(self.grid), max(map(len, self.grid))
@@ -56,6 +58,8 @@ class GridWorld:
             absorb (boolean): True if the next_state is absorsing, False otherwise
         """
         r, c = self.state2coord[state]
+        if action not in self.state_actions[state]:
+            print('Attempting action {} from state {}'.format(action, state))
         assert action in self.state_actions[state]
         if isinstance(self.grid[r][c], numbers.Number):
             return state, 0, True
@@ -84,8 +88,9 @@ class GridWorld:
 
         if self.render:
             self.show(state, action, next_state, reward)
+            time.sleep(0.3)
 
-        return next_state, reward, absorb
+        return next_state, reward - self.time_penalty, absorb
 
     def show(self, state, action, next_state, reward):
         dim = 200
