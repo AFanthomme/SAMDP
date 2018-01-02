@@ -74,53 +74,7 @@ class decorated_env:
                 idx += 1
 
 
-        return q_estimate, None # To be removed, just in case need to go back
-
-    # def q_estimation_noskill(self, n_epochs=100, epsilon=0.1):
-    #     env = self.env
-    #     n_actions = 4  # Hardcode this for simplicity as in ex_1
-    #
-    #     ep_length = 30 # Set it high to be in the case where all trajectories reach exits
-    #     nb_encounters = np.zeros((env.n_states, n_actions))
-    #     q_estimate = np.zeros((env.n_states, n_actions))
-    #     rewards_record = []
-    #
-    #     # The learning rate for Q(x,a) at a given time t is taken as the inverse of
-    #     # the number of times (x,a) has been visited previously.
-    #     # This is the simplest rate satisfying the Robbins-Monro conditions.
-    #     alpha = lambda state, action: 1. / nb_encounters[state, action]
-    #
-    #     for epoch in range(n_epochs):
-    #         t = 0
-    #         state = env.reset()
-    #         term = False
-    #         epoch_reward = 0
-    #
-    #         while not term and t < ep_length:
-    #             possible_actions = env.state_actions[state]
-    #             if np.random.rand() < 1. - epsilon:
-    #                 # With probability 1-epsilon, act according to the greedy policy, estimated using Q
-    #                 actions = np.argwhere(q_estimate[state, :] == np.max(q_estimate[state, :])).flatten()
-    #                 actions = np.intersect1d(actions, possible_actions)
-    #             else:
-    #                 # With probability epsilon, pick an available action at random.
-    #                 # This ensures that every state should be visited an infinite number of times.
-    #                actions = possible_actions
-    #
-    #             action = actions[np.random.randint(len(actions))]
-    #             nextstate, reward, term = env.step(state, action)
-    #
-    #             nb_encounters[state, action] += 1
-    #             epoch_reward += reward
-    #
-    #             alpha_k = alpha(state, action)
-    #             q_estimate[state, action] = (1. - alpha_k) * q_estimate[state, action] + alpha_k * (reward + env.gamma *
-    #                                 np.max(q_estimate[nextstate, :]))
-    #             state = nextstate
-    #             t += 1
-    #         rewards_record.append(epoch_reward)
-    #
-    #     return q_estimate, rewards_record
+        return q_estimate
 
 
     def TRIOVI(self, vi_steps=100, option_updates=100, regularizer=None, monitor_performance=None):
@@ -147,7 +101,7 @@ class decorated_env:
         for t in range(option_updates):
             # Since we do not have access to the real transition probabilities, we use the Q-learning procedure from TD1
             # instead of VI to obtain the new Q function.
-            current_Q, _ = self.q_estimation(n_epochs=vi_steps)
+            current_Q = self.q_estimation(n_epochs=vi_steps)
 
             for idx, option in enumerate(current_options):
                 option['term'] = np.maximum(initial_options[idx]['term'],
@@ -180,7 +134,7 @@ class decorated_env:
                              and self.options[i]['term'][state] < 0.99]
         return np.random.choice(possible_actions)
 
-    def generate_trajectory(self, T=20, noise=0.1):
+    def generate_trajectory(self, T=30, noise=0.):
         env = self.env
         state = env.reset()
 
@@ -225,7 +179,7 @@ def test_triovi():
             ['', 'x', '', -1],
             ['', '', '', '']
         ]
-    env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.01)
+    env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0)
     example = decorated_env(env, terminal_states=[3, 6])
 
     # Remove from inits states where a certain action cannot be initiated
@@ -254,7 +208,7 @@ def test_true_grid():
             ['', '', '', '', '', 'x', ''],
             [-1, 'x', '', '', '', '', ''],
         ]
-    env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.01)
+    env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0)
     example = decorated_env(env, terminal_states=[3, 4, 16])
 
     # Remove from inits states where a certain action cannot be initiated
@@ -269,7 +223,7 @@ def test_true_grid():
     example.options[2]['term'][[0, 3, 4, 5, 7, 10, 15, 16, 17]] = 1.
     example.options[3]['term'][[0, 1, 2, 3, 4, 7, 9, 12, 13, 16, 20]] = 1.
 
-    example.TRIOVI(vi_steps=70, option_updates=70, monitor_performance=100, regularizer=2)
+    example.TRIOVI(vi_steps=50, option_updates=100, monitor_performance=400, regularizer=1)
     example.plot_terminations()
     example.env.render = True
     for _ in range(5):
