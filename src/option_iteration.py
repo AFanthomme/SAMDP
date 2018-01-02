@@ -203,12 +203,12 @@ def test_triovi():
 def test_true_grid():
     grid = \
         [
-            ['', '', '', 1, 'x', 1, 'x'],
+            ['', '', '', -1, 'x', 1, 'x'],
             ['', '', 'x', 'x', '', '', ''],
             ['', '', '', '', '', 'x', ''],
-            [-1, 'x', '', '', '', '', ''],
+            [1, 'x', '', '', '', '', ''],
         ]
-    env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0)
+    env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0, noise=0.1)
     example = decorated_env(env, terminal_states=[3, 4, 16])
 
     # Remove from inits states where a certain action cannot be initiated
@@ -223,10 +223,11 @@ def test_true_grid():
     example.options[2]['term'][[0, 3, 4, 5, 7, 10, 15, 16, 17]] = 1.
     example.options[3]['term'][[0, 1, 2, 3, 4, 7, 9, 12, 13, 16, 20]] = 1.
 
-    example.TRIOVI(vi_steps=50, option_updates=100, monitor_performance=400, regularizer=1)
+    example.TRIOVI(vi_steps=50, option_updates=100, monitor_performance=400, regularizer=2)
     example.plot_terminations()
+    example.env.noise = 0.
     example.env.render = True
-    for _ in range(5):
+    for _ in range(25):
         example.generate_trajectory()
 
 if __name__ == '__main__':

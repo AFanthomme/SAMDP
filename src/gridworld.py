@@ -10,7 +10,7 @@ MDP = namedtuple('MDP', 'S,A,P,R,gamma,d0')
 
 
 class GridWorld:
-    def __init__(self, gamma=0.95, grid=None, render=False, time_penalty=0.1):
+    def __init__(self, gamma=0.95, grid=None, render=False, time_penalty=0.1, noise=0.1):
         self.grid = grid
         self.time_penalty = time_penalty
         self.action_names = np.array(['right', 'down', 'left', 'up'])
@@ -34,7 +34,7 @@ class GridWorld:
         # compute the actions available in each state
         self.compute_available_actions()
         self.gamma = gamma
-        self.proba_succ = 0.9
+        self.proba_succ = 1. - noise
         self.render = render
 
     def reset(self):
