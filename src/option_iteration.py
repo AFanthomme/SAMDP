@@ -9,9 +9,11 @@ from src.gridworld import GridWorld
 import matplotlib.pyplot as p
 import src.gridrender as gui
 from copy import deepcopy
-import pickle
+import pickle, pdb
 from progress.bar import Bar
-
+from tkinter import Tk
+import tkinter.font as tkfont
+import numbers
 
 class decorated_env:
     def __init__(self, env, terminal_states=None):
@@ -171,9 +173,101 @@ class decorated_env:
                 skill_in_use = self.choose_skill(state)
                 termination_probs = self.options[skill_in_use]['term']
 
-
         return states, skills, next_states, rewards
 
+    def aggregate_states(self, K, w, nb_it=100):
+        # K : number of clusters
+        # w : size of the sliding window
+
+        ##### random initialization ######
+
+        N = self.env.n_states
+        cluster_coord = [ self.env.state2coord[state] for state in np.random.choice(range(N),size=K,replace=False) ]
+        clustering = np.zeros(N, dtype=int)
+
+        for state in range(N):
+            coord = np.array(self.env.state2coord[state])
+            clustering[state] = np.argmin([np.linalg.norm(coord - cluster_coord[k]) for k in range(K)])
+
+        for it in range(nb_it):
+            # We update the clustering after every trajectory
+
+            # simulate a trajectory
+            traj = self.generate_trajectory(T=100, noise=0.)[0]
+
+            # update cluster_coord
+            for k in range(K):
+                states_k = np.array(self.env.state2coord)[clustering==k]
+                if len(states_k)==0: # then no state is assigned to cluster k
+                    continue
+                cluster_coord[k] = states_k.sum(axis=0) / float(len(states_k))
+
+            # update clustering
+            for state in range(N):
+                if state in traj:
+                    state_idx = np.where(traj==state)[0][0]
+                    ext_state = traj[int(max(state_idx-w, 0)):int(min(state_idx+w+1, len(traj)))]
+                    ext_state_coord = np.array([self.env.state2coord[i] for i in ext_state])
+                    clustering[state] = np.argmin([np.linalg.norm(ext_state_coord-cluster_coord[k]) for k in range(K)])
+
+        self.cluster_coord = cluster_coord
+        self.clustering = clustering
+
+    def show_clustering(self):
+
+        if hasattr(self, 'cluster_coord'):
+            dim = 70
+            rows, cols = len(self.env.grid) + 0.5, max(map(len, self.env.grid))
+            if hasattr(self, 'window'):
+                del(self.window)
+
+            root = Tk()
+            self.window = gui.GUI(root)
+
+            self.window.config(width=cols * (dim + 12), height=rows * (dim + 12))
+            my_font = tkfont.Font(family="Arial", size=32, weight="bold")
+            for s in range(self.env.n_states):
+                r, c = self.env.state2coord[s]
+                x, y = 10 + c * (dim + 4), 10 + r * (dim + 4)
+                if isinstance(self.env.grid[r][c], numbers.Number):
+                    self.window.create_polygon([x, y, x + dim, y, x + dim, y + dim, x, y + dim], outline='black',
+                                               fill='blue', width=2)
+                    self.window.create_text(x + dim / 2., y + dim / 2., text="{:.1f}".format(self.env.grid[r][c]),
+                                            font=my_font, fill='white')
+                else:
+                    self.window.create_polygon([x, y, x + dim, y, x + dim, y + dim, x, y + dim], outline='black',
+                                               fill='white', width=2)
+            self.window.pack()
+
+            my_font = tkfont.Font(family="Arial", size=32, weight="bold")
+
+            cluster_color = []
+            r = lambda: np.random.randint(0,255)
+            for cluster_idx in range(len(self.cluster_coord)):
+                cluster_color.append('#%02X%02X%02X' % (r(),r(),r()))
+
+            self.polygons = []
+            for state, cluster_idx in enumerate(self.clustering):
+                r, c = self.env.state2coord[state]
+                x, y = 10 + c * (dim + 4), 10 + r * (dim + 4)
+                self.polygons.append( self.window.create_polygon([x, y, x + dim, y, x + dim, y + dim, x, y + dim], outline='black', fill=cluster_color[cluster_idx], width=2) )
+
+            self.ovals = []
+            for cluster_idx,cluster in enumerate(self.cluster_coord):
+                r1, c1 = 10 + cluster[1] * (dim + 4), 10 + cluster[0] * (dim + 4)
+                x1, y1 = r1 + dim / 2., c1 + dim / 2.
+                self.ovals.append( self.window.create_oval(x1 - dim / 5., y1 - dim / 5., x1 + dim / 5., y1 + dim / 5., fill=cluster_color[cluster_idx]) )
+
+            for oval in self.ovals:
+                if hasattr(self, str(oval)):
+                    self.window.delete(oval)
+            for polygon in self.polygons:
+                if hasattr(self, str(polygon)):
+                    self.window.delete(polygon)
+
+            self.window.update()
+        else:
+            print("Error : first run method 'aggregate_states' to compute clustering")        
 
 def test_triovi():
     grid = \
@@ -230,9 +324,11 @@ def test_true_grid():
     pickle.dump(example, open('grid1.pkl', 'wb'))
     example.plot_terminations()
     example.env.noise = 0.
-    example.env.render = True
+    """example.env.render = True
     for _ in range(25):
-        example.generate_trajectory()
+        example.generate_trajectory()"""
+
+    return example
 
 def gridmaker(grid, terminal_positions):
     env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0, noise=0.1)
@@ -272,10 +368,11 @@ def test_gridmaker():
     pickle.dump(example, open('goodboy.pkl', 'wb'))
     example.plot_terminations()
     example.env.noise = 0.
-    example.env.render = True
+    """example.env.render = True
     for _ in range(25):
-        example.generate_trajectory()
+        example.generate_trajectory()"""
 
+    return example
 
 if __name__ == '__main__':
     # test_triovi()
