@@ -10,6 +10,7 @@ import matplotlib.pyplot as p
 import src.gridrender as gui
 from copy import deepcopy
 import pickle
+from progress.bar import Bar
 
 
 class decorated_env:
@@ -79,45 +80,6 @@ class decorated_env:
         return q_estimate
 
 
-    # def TRIOVI(self, vi_steps=100, option_updates=100, regularizer=0.95, monitor_performance=None):
-    #     """
-    #     Use the TRIOVI rule to train skills by interrrupting the initial options.
-    #
-    #     :param initial_options:
-    #     :param regularizer:
-    #     :return:
-    #     """
-    #
-    #     rho = lambda t: regularizer
-    #
-    #     if monitor_performance:
-    #         performance_record = np.zeros(option_updates)
-    #
-    #     initial_options = self.options
-    #     current_options = initial_options
-    #     alpha = np.ones((self.n_options, self.n_states))
-    #
-    #     for t in range(option_updates):
-    #         # Since we do not have access to the real transition probabilities, we use the Q-learning procedure from TD1
-    #         # instead of VI to obtain the new Q function.
-    #         current_Q = self.q_estimation(n_epochs=vi_steps)
-    #
-    #         for idx, option in enumerate(current_options):
-    #             option['term'] = np.maximum(initial_options[idx]['term'],
-    #                                     (current_Q[:, idx] < np.max(current_Q, axis=1) - rho(t) * alpha[idx, :]).astype(float))
-    #             alpha[idx, :] = option['term'] < 1
-    #
-    #         if monitor_performance:
-    #             performance_record[t] = np.mean([np.sum(self.generate_trajectory(T=20)[3]) for _ in range(monitor_performance)])
-    #
-    #     if monitor_performance:
-    #         p.plot(performance_record)
-    #         p.title('Evolution of the performance as a function of the number of iterations')
-    #         p.show()
-    #
-    #     self.options = current_options
-    #     return current_options
-
     def TRIOVI(self, vi_steps=100, option_updates=100, regularizer=0.95, horizon=30, monitor_performance=None, epsilon=0.):
         """
         Use the TRIOVI rule to train skills by interrrupting the initial options.
@@ -134,7 +96,10 @@ class decorated_env:
         current_options = self.options
         alpha = np.ones((self.n_options, self.n_states))
 
+
         for t in range(option_updates):
+            if t%(option_updates//10) == 0:
+                print('{}% done'.format((100.*t)//option_updates))
             # Since we do not have access to the real transition probabilities, we use the Q-learning procedure from TD1
             # instead of VI to obtain the new Q function.
             current_Q = self.q_estimation(n_epochs=vi_steps, T=horizon, epsilon=epsilon)
@@ -152,7 +117,6 @@ class decorated_env:
             p.title('Evolution of the performance as a function of the number of iterations')
             p.show()
 
-        self.options = current_options
         return current_options
 
     def plot_terminations(self):
@@ -262,7 +226,7 @@ def test_true_grid():
     example.options[2]['term'][[0, 3, 4, 5, 7, 10, 15, 16, 17]] = 1.
     example.options[3]['term'][[0, 1, 2, 3, 4, 7, 9, 12, 13, 16, 20]] = 1.
 
-    example.TRIOVI(vi_steps=700, option_updates=50, horizon=8, monitor_performance=50, regularizer=0.)
+    example.TRIOVI(vi_steps=4500, option_updates=100, horizon=20, monitor_performance=300, regularizer=0.)
     pickle.dump(example, open('grid1.pkl', 'wb'))
     example.plot_terminations()
     example.env.noise = 0.
@@ -291,7 +255,7 @@ def gridmaker(grid, terminal_positions):
 def test_gridmaker():
     grid = \
         [
-            [2., 'x', '', 'x', '', '', 'x', '', '', '', '', 1],
+            [4., 'x', '', 'x', '', '', 'x', '', '', '', '', 1],
             ['', 'x', '', '', '', '', 'x', '', '', '', '', ''],
             ['', 'x', '', 'x', '', '', 'x', 'x', 'x', 'x', 'x', ''],
             ['', '', '', 'x', '', '', '', '', '', '', 'x', ''],
@@ -299,12 +263,12 @@ def test_gridmaker():
             ['', 'x', '', '', '', 'x', '', -1, 'x', 'x', 'x', ''],
             ['', 'x', '', '', '', 'x', '', '', '', '', '', ''],
             ['', '', '', '', '', '', '', '', '', '', '', ''],
-            ['', '', '1', '', '', 'x', '', '', '', '', '', ''],
+            ['', '', 1, '', '', 'x', '', '', '', '', '', ''],
         ]
 
     terminal_positions = [(0,0), (0, 11), (2, 8), (5, 7)]
     example = gridmaker(grid, terminal_positions)
-    example.TRIOVI(vi_steps=1000, option_updates=1, horizon=40, monitor_performance=50, regularizer=0.)
+    example.TRIOVI(vi_steps=4000, option_updates=70, horizon=15, monitor_performance=None, regularizer=0.)
     pickle.dump(example, open('goodboy.pkl', 'wb'))
     example.plot_terminations()
     example.env.noise = 0.
@@ -315,5 +279,5 @@ def test_gridmaker():
 
 if __name__ == '__main__':
     # test_triovi()
-    test_true_grid()
-    # test_gridmaker()
+    # test_true_grid()
+    test_gridmaker()
