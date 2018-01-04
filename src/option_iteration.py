@@ -1,8 +1,10 @@
-# Implementation of the Time-Regularized Interrupting options framework
-# Ref : Mankowitz, D. J.; Mann, T. A.; and Mannor, S. 2014. Time regularized interrupting options. International
-#       Conference on Machine Learning
+'''
+Implementation of the Time-Regularized Interrupting options framework
+Ref : Mankowitz, D. J.; Mann, T. A.; and Mannor, S. 2014. Time regularized interrupting options. International
+      Conference on Machine Learning
 
-# Implementation : Arnaud Fanthomme
+Implementation : Arnaud Fanthomme and Antoine Goblet
+'''
 
 import numpy as np
 from src.gridworld import GridWorld
@@ -10,7 +12,6 @@ import matplotlib.pyplot as p
 import src.gridrender as gui
 from copy import deepcopy
 import pickle, pdb
-from progress.bar import Bar
 from tkinter import Tk
 import tkinter.font as tkfont
 import numbers
@@ -28,20 +29,12 @@ class decorated_env:
         {'init': range(self.n_states), 'term': np.zeros(self.n_states), 'pol': 2 * np.ones(self.n_states, dtype=int)},
         {'init': range(self.n_states), 'term': np.zeros(self.n_states), 'pol': 3 * np.ones(self.n_states, dtype=int)}]
 
-        # Not functional
-        # if terminal_states:
-        #     for state in terminal_states:
-        #         for option in range(self.n_options):
-        #             self.options[option]['init'] = np.delete(self.options[option]['init'], state)
-        #             self.options[option]['term'][state] = 1.
-
-
     def q_estimation(self, n_epochs=100, T=30, epsilon=0., seed=None):
         env = self.env
         n_actions = 4  # Hardcode this for simplicity as in ex_1
         if seed:
             np.random.seed(seed)
-        ep_length = T # Set it high to be in the case where all trajectories reach exits
+        ep_length = T # This influences the final options quite a lot
         nb_encounters = np.zeros((env.n_states, n_actions))
         q_estimate = np.zeros((env.n_states, n_actions))
 
@@ -52,11 +45,12 @@ class decorated_env:
 
         for epoch in range(n_epochs):
             states, skills, next_states, rewards = self.generate_trajectory(T=ep_length, noise=epsilon)
-            idx = 0
+            idx, skill_reward = 0, 0
+
             for state, skill, next_state, reward in zip(states, skills, next_states, rewards):
                 if idx == 0:
                     previous_option = skill
-                    skill_reward = 0
+
                     initiating_state = state
                 elif idx == len(states) - 1:
                     skill_reward += reward
@@ -78,11 +72,10 @@ class decorated_env:
                     skill_reward += reward
                 idx += 1
 
-
         return q_estimate
 
 
-    def TRIOVI(self, vi_steps=100, option_updates=100, regularizer=0.95, horizon=30, monitor_performance=None, epsilon=0.):
+    def IOVI(self, vi_steps=100, option_updates=100, regularizer=0.95, horizon=30, monitor_performance=None, epsilon=0.):
         """
         Use the TRIOVI rule to train skills by interrrupting the initial options.
 
@@ -291,7 +284,7 @@ def test_triovi():
     example.options[2]['term'][[0, 3, 4, 6, 5, 7]] = 1.
     example.options[3]['term'][[0, 1, 2, 3, 6, 8]] = 1.
 
-    example.TRIOVI(vi_steps=50, option_updates=40, monitor_performance=100, regularizer=0.95)
+    example.IOVI(vi_steps=50, option_updates=40, monitor_performance=100, regularizer=0.95)
     # example.plot_terminations()
     example.env.render = True
     for _ in range(5):
@@ -320,7 +313,7 @@ def test_true_grid():
     example.options[2]['term'][[0, 3, 4, 5, 7, 10, 15, 16, 17]] = 1.
     example.options[3]['term'][[0, 1, 2, 3, 4, 7, 9, 12, 13, 16, 20]] = 1.
 
-    example.TRIOVI(vi_steps=4500, option_updates=100, horizon=20, monitor_performance=300, regularizer=0.)
+    example.IOVI(vi_steps=4500, option_updates=100, horizon=20, monitor_performance=300, regularizer=0.)
     pickle.dump(example, open('grid1.pkl', 'wb'))
     example.plot_terminations()
     example.env.noise = 0.
@@ -364,13 +357,9 @@ def test_gridmaker():
 
     terminal_positions = [(0,0), (0, 11), (2, 8), (5, 7)]
     example = gridmaker(grid, terminal_positions)
-    example.TRIOVI(vi_steps=4000, option_updates=70, horizon=15, monitor_performance=None, regularizer=0.)
+    example.IOVI(vi_steps=4000, option_updates=70, horizon=15, monitor_performance=None, regularizer=0.)
     pickle.dump(example, open('goodboy.pkl', 'wb'))
-    example.plot_terminations()
-    example.env.noise = 0.
-    """example.env.render = True
-    for _ in range(25):
-        example.generate_trajectory()"""
+    # example.plot_terminations()
 
     return example
 

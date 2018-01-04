@@ -1,7 +1,7 @@
 import numpy as np
 from collections import namedtuple
 import numbers
-import gridrender as gui
+import src.gridrender as gui
 from tkinter import Tk
 import tkinter.font as tkfont
 import time
