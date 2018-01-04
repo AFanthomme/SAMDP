@@ -8,6 +8,8 @@ import numpy as np
 from src.gridworld import GridWorld
 import matplotlib.pyplot as p
 import src.gridrender as gui
+from copy import deepcopy
+import pickle
 
 
 class decorated_env:
@@ -31,12 +33,12 @@ class decorated_env:
         #             self.options[option]['term'][state] = 1.
 
 
-    def q_estimation(self, n_epochs=100, epsilon=0., seed=None):
+    def q_estimation(self, n_epochs=100, T=30, epsilon=0., seed=None):
         env = self.env
         n_actions = 4  # Hardcode this for simplicity as in ex_1
         if seed:
             np.random.seed(seed)
-        ep_length = 30 # Set it high to be in the case where all trajectories reach exits
+        ep_length = T # Set it high to be in the case where all trajectories reach exits
         nb_encounters = np.zeros((env.n_states, n_actions))
         q_estimate = np.zeros((env.n_states, n_actions))
 
@@ -77,7 +79,46 @@ class decorated_env:
         return q_estimate
 
 
-    def TRIOVI(self, vi_steps=100, option_updates=100, regularizer=None, monitor_performance=None):
+    # def TRIOVI(self, vi_steps=100, option_updates=100, regularizer=0.95, monitor_performance=None):
+    #     """
+    #     Use the TRIOVI rule to train skills by interrrupting the initial options.
+    #
+    #     :param initial_options:
+    #     :param regularizer:
+    #     :return:
+    #     """
+    #
+    #     rho = lambda t: regularizer
+    #
+    #     if monitor_performance:
+    #         performance_record = np.zeros(option_updates)
+    #
+    #     initial_options = self.options
+    #     current_options = initial_options
+    #     alpha = np.ones((self.n_options, self.n_states))
+    #
+    #     for t in range(option_updates):
+    #         # Since we do not have access to the real transition probabilities, we use the Q-learning procedure from TD1
+    #         # instead of VI to obtain the new Q function.
+    #         current_Q = self.q_estimation(n_epochs=vi_steps)
+    #
+    #         for idx, option in enumerate(current_options):
+    #             option['term'] = np.maximum(initial_options[idx]['term'],
+    #                                     (current_Q[:, idx] < np.max(current_Q, axis=1) - rho(t) * alpha[idx, :]).astype(float))
+    #             alpha[idx, :] = option['term'] < 1
+    #
+    #         if monitor_performance:
+    #             performance_record[t] = np.mean([np.sum(self.generate_trajectory(T=20)[3]) for _ in range(monitor_performance)])
+    #
+    #     if monitor_performance:
+    #         p.plot(performance_record)
+    #         p.title('Evolution of the performance as a function of the number of iterations')
+    #         p.show()
+    #
+    #     self.options = current_options
+    #     return current_options
+
+    def TRIOVI(self, vi_steps=100, option_updates=100, regularizer=0.95, horizon=30, monitor_performance=None, epsilon=0.):
         """
         Use the TRIOVI rule to train skills by interrrupting the initial options.
 
@@ -86,26 +127,21 @@ class decorated_env:
         :return:
         """
 
-        if type(regularizer) == float:
-            rho = lambda t: regularizer ** t * 1. / (1-0.95)
-        else:
-            rho = lambda t: 0.95
-
         if monitor_performance:
             performance_record = np.zeros(option_updates)
 
-        initial_options = self.options
-        current_options = initial_options
+        initial_options = deepcopy(self.options)
+        current_options = self.options
         alpha = np.ones((self.n_options, self.n_states))
 
         for t in range(option_updates):
             # Since we do not have access to the real transition probabilities, we use the Q-learning procedure from TD1
             # instead of VI to obtain the new Q function.
-            current_Q = self.q_estimation(n_epochs=vi_steps)
+            current_Q = self.q_estimation(n_epochs=vi_steps, T=horizon, epsilon=epsilon)
 
             for idx, option in enumerate(current_options):
                 option['term'] = np.maximum(initial_options[idx]['term'],
-                                        (current_Q[:, idx] < np.max(current_Q, axis=1) - rho(t) * alpha[idx, :]).astype(float))
+                                        (current_Q[:, idx] < np.max(current_Q, axis=1) - regularizer * alpha[idx, :]).astype(float))
                 alpha[idx, :] = option['term'] < 1
 
             if monitor_performance:
@@ -132,7 +168,10 @@ class decorated_env:
     def choose_skill(self, state):
         possible_actions = [i for i in range(self.n_options) if state in self.options[i]['init']
                              and self.options[i]['term'][state] < 0.99]
-        return np.random.choice(possible_actions)
+        try:
+            return np.random.choice(possible_actions)
+        except ValueError:
+            raise RuntimeError('No actions possible in state {}'.format(state))
 
     def generate_trajectory(self, T=30, noise=0.):
         env = self.env
@@ -194,7 +233,7 @@ def test_triovi():
     example.options[2]['term'][[0, 3, 4, 6, 5, 7]] = 1.
     example.options[3]['term'][[0, 1, 2, 3, 6, 8]] = 1.
 
-    example.TRIOVI(vi_steps=50, option_updates=40, monitor_performance=100)
+    example.TRIOVI(vi_steps=50, option_updates=40, monitor_performance=100, regularizer=0.95)
     # example.plot_terminations()
     example.env.render = True
     for _ in range(5):
@@ -223,13 +262,58 @@ def test_true_grid():
     example.options[2]['term'][[0, 3, 4, 5, 7, 10, 15, 16, 17]] = 1.
     example.options[3]['term'][[0, 1, 2, 3, 4, 7, 9, 12, 13, 16, 20]] = 1.
 
-    example.TRIOVI(vi_steps=50, option_updates=100, monitor_performance=400, regularizer=2)
+    example.TRIOVI(vi_steps=700, option_updates=50, horizon=8, monitor_performance=50, regularizer=0.)
+    pickle.dump(example, open('grid1.pkl', 'wb'))
     example.plot_terminations()
     example.env.noise = 0.
     example.env.render = True
     for _ in range(25):
         example.generate_trajectory()
 
+def gridmaker(grid, terminal_positions):
+    env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0, noise=0.1)
+    # print(env.state2coord)
+    terminal_states = [env.coord2state[position[0], position[1]] for position in terminal_positions]
+    options_mdp = decorated_env(env, terminal_states=terminal_states)
+    problematic_states = [[state for state in range(env.n_states) if action not in env.state_actions[state] or
+                           state in terminal_states] for action in range(4)]
+
+    # Remove from inits states where a certain action cannot be initiated
+    for action in range(4):
+        options_mdp.options[action]['init'] = np.delete(options_mdp.options[action]['init'], problematic_states[action])
+
+    # Add termination probabilities of 1 for states where a certain action is forbidden
+    for action in range(4):
+        options_mdp.options[action]['term'][problematic_states[action]] = 1.
+
+    return options_mdp
+
+def test_gridmaker():
+    grid = \
+        [
+            [2., 'x', '', 'x', '', '', 'x', '', '', '', '', 1],
+            ['', 'x', '', '', '', '', 'x', '', '', '', '', ''],
+            ['', 'x', '', 'x', '', '', 'x', 'x', 'x', 'x', 'x', ''],
+            ['', '', '', 'x', '', '', '', '', '', '', 'x', ''],
+            ['x', '', 'x', 'x', '', '', '', '', '', '', 'x', ''],
+            ['', 'x', '', '', '', 'x', '', -1, 'x', 'x', 'x', ''],
+            ['', 'x', '', '', '', 'x', '', '', '', '', '', ''],
+            ['', '', '', '', '', '', '', '', '', '', '', ''],
+            ['', '', '1', '', '', 'x', '', '', '', '', '', ''],
+        ]
+
+    terminal_positions = [(0,0), (0, 11), (2, 8), (5, 7)]
+    example = gridmaker(grid, terminal_positions)
+    example.TRIOVI(vi_steps=1000, option_updates=1, horizon=40, monitor_performance=50, regularizer=0.)
+    pickle.dump(example, open('goodboy.pkl', 'wb'))
+    example.plot_terminations()
+    example.env.noise = 0.
+    example.env.render = True
+    for _ in range(25):
+        example.generate_trajectory()
+
+
 if __name__ == '__main__':
     # test_triovi()
     test_true_grid()
+    # test_gridmaker()

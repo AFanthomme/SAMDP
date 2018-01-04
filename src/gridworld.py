@@ -10,7 +10,7 @@ MDP = namedtuple('MDP', 'S,A,P,R,gamma,d0')
 
 
 class GridWorld:
-    def __init__(self, gamma=0.95, grid=None, render=False, time_penalty=0.1, noise=0.1):
+    def __init__(self, gamma=0.95, grid=None, render=False, time_penalty=0., noise=0.1):
         self.grid = grid
         self.time_penalty = time_penalty
         self.action_names = np.array(['right', 'down', 'left', 'up'])
