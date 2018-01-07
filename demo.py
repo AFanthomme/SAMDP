@@ -8,12 +8,15 @@ import src.option_iteration
 from src.gridworld import GridWorld
 import time
 
+def pause():
+    programPause = input("Press the <ENTER> key to continue...")
+
 if __name__ == '__main__':
 
     example = src.option_iteration.test_gridmaker()
     example.aggregate_states(K=5,w=3)
     example.show_clustering()
-    time.sleep(15)
+    # pause()
 
     example.env.render = True
     for _ in range(25):

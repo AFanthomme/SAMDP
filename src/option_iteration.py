@@ -16,11 +16,35 @@ from tkinter import Tk
 import tkinter.font as tkfont
 import numbers
 
-class decorated_env:
-    def __init__(self, env, terminal_states=None):
-        self.env = env
-        self.n_states = env.n_states
-        self.terminal_states =terminal_states
+def gridmaker(grid, terminal_positions):
+    env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0, noise=0.1)
+    terminal_states = [env.coord2state[position[0], position[1]] for position in terminal_positions]
+    options_mdp = option_gridworld(env, terminal_states=terminal_states)
+    problematic_states = [[state for state in range(env.n_states) if action not in env.state_actions[state] or
+                           state in terminal_states] for action in range(4)]
+
+    # Remove from inits states where a certain action cannot be initiated
+    for action in range(4):
+        options_mdp.options[action]['init'] = np.delete(options_mdp.options[action]['init'], problematic_states[action])
+
+    # Add termination probabilities of 1 for states where a certain action is forbidden
+    for action in range(4):
+        options_mdp.options[action]['term'][problematic_states[action]] = 1.
+
+    return options_mdp
+
+class option_gridworld:
+    def __init__(self, grid=None, env=None, terminal_states=None, terminal_positions=None):
+        self.terminal_states = terminal_states
+
+        if grid is None:
+            if env is None:
+                raise RuntimeError('Please provide either a grid or a Gridworld environment')
+            self.env = env
+        else:
+            self.env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0, noise=0.1)
+
+        self.n_states = self.env.n_states
         # Default options are going straight in one direction, can be started anywhere and never terminate.
         self.n_options = 4
         self.options = [
@@ -28,6 +52,17 @@ class decorated_env:
         {'init': range(self.n_states), 'term': np.zeros(self.n_states), 'pol': 1 * np.ones(self.n_states, dtype=int)},
         {'init': range(self.n_states), 'term': np.zeros(self.n_states), 'pol': 2 * np.ones(self.n_states, dtype=int)},
         {'init': range(self.n_states), 'term': np.zeros(self.n_states), 'pol': 3 * np.ones(self.n_states, dtype=int)}]
+
+        if self.terminal_states is None:
+            self.terminal_states = [self.env.coord2state[position[0], position[1]] for position in terminal_positions]
+
+        problematic_states = [[state for state in range(self.env.n_states) if action not in self.env.state_actions[state] or
+                               state in self.terminal_states] for action in range(4)]
+        for action in range(4):
+            self.options[action]['init'] = np.delete(self.options[action]['init'], problematic_states[action])
+
+        for action in range(4):
+            self.options[action]['term'][problematic_states[action]] = 1.
 
     def q_estimation(self, n_epochs=100, T=30, epsilon=0., seed=None):
         env = self.env
@@ -38,9 +73,6 @@ class decorated_env:
         nb_encounters = np.zeros((env.n_states, n_actions))
         q_estimate = np.zeros((env.n_states, n_actions))
 
-        # The learning rate for Q(x,a) at a given time t is taken as the inverse of
-        # the number of times (x,a) has been visited previously.
-        # This is the simplest rate satisfying the Robbins-Monro conditions.
         alpha = lambda state, action: 1. / nb_encounters[state, action]
 
         for epoch in range(n_epochs):
@@ -77,7 +109,7 @@ class decorated_env:
 
     def IOVI(self, vi_steps=100, option_updates=100, regularizer=0.95, horizon=30, monitor_performance=None, epsilon=0.):
         """
-        Use the TRIOVI rule to train skills by interrrupting the initial options.
+        Use the IOVI procedure to train skills by interrrupting the initial options.
 
         :param initial_options:
         :param regularizer:
@@ -270,7 +302,7 @@ def test_triovi():
             ['', '', '', '']
         ]
     env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0)
-    example = decorated_env(env, terminal_states=[3, 6])
+    example = option_gridworld(env, terminal_states=[3, 6])
 
     # Remove from inits states where a certain action cannot be initiated
     example.options[0]['init'] = np.delete(example.options[0]['init'], [3, 4, 6, 10])
@@ -299,7 +331,7 @@ def test_true_grid():
             [1, 'x', '', '', '', '', ''],
         ]
     env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0, noise=0.1)
-    example = decorated_env(env, terminal_states=[3, 4, 16])
+    example = option_gridworld(env, terminal_states=[3, 4, 16])
 
     # Remove from inits states where a certain action cannot be initiated
     example.options[0]['init'] = np.delete(example.options[0]['init'], [3, 4, 6, 9, 14, 15, 16, 21])
@@ -323,23 +355,7 @@ def test_true_grid():
 
     return example
 
-def gridmaker(grid, terminal_positions):
-    env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0, noise=0.1)
-    # print(env.state2coord)
-    terminal_states = [env.coord2state[position[0], position[1]] for position in terminal_positions]
-    options_mdp = decorated_env(env, terminal_states=terminal_states)
-    problematic_states = [[state for state in range(env.n_states) if action not in env.state_actions[state] or
-                           state in terminal_states] for action in range(4)]
 
-    # Remove from inits states where a certain action cannot be initiated
-    for action in range(4):
-        options_mdp.options[action]['init'] = np.delete(options_mdp.options[action]['init'], problematic_states[action])
-
-    # Add termination probabilities of 1 for states where a certain action is forbidden
-    for action in range(4):
-        options_mdp.options[action]['term'][problematic_states[action]] = 1.
-
-    return options_mdp
 
 def test_gridmaker():
     grid = \
@@ -356,7 +372,7 @@ def test_gridmaker():
         ]
 
     terminal_positions = [(0,0), (0, 11), (2, 8), (5, 7)]
-    example = gridmaker(grid, terminal_positions)
+    example = option_gridworld(grid=grid, terminal_positions=terminal_positions)
     example.IOVI(vi_steps=4000, option_updates=70, horizon=15, monitor_performance=None, regularizer=0.)
     pickle.dump(example, open('goodboy.pkl', 'wb'))
     # example.plot_terminations()
