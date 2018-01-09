@@ -379,11 +379,11 @@ def test_gridmaker():
         ]
 
     terminal_positions = [(0,0), (0, 11), (2, 8), (5, 7)]
-    """example = option_gridworld(grid=grid, terminal_positions=terminal_positions)
+    example = option_gridworld(grid=grid, terminal_positions=terminal_positions)
     example.IOVI(vi_steps=4000, option_updates=70, horizon=15, monitor_performance=None, regularizer=0.)
-    pickle.dump(example, open('goodboy.pkl', 'wb'))"""
-    print("Loading goodboy.pkl")
-    example = pickle.load(open('goodboy.pkl','rb'))
+    pickle.dump(example, open('goodboy.pkl', 'wb'))
+    """print("Loading goodboy.pkl")
+    example = pickle.load(open('goodboy.pkl','rb'))"""
     # example.plot_terminations()
 
     return example
