@@ -7,14 +7,17 @@ Implementation : Arnaud Fanthomme and Antoine Goblet
 import src.option_iteration
 from src.gridworld import GridWorld
 import time
+import numpy as np
 
 def pause():
     programPause = input("Press the <ENTER> key to continue...")
 
 if __name__ == '__main__':
 
+    np.random.seed(1)
+    
     example = src.option_iteration.test_gridmaker()
-    example.aggregate_states(K=5,w=3)
+    example.aggregate_states(K=5,w=3,nb_it=500)
     example.show_clustering()
     # pause()
 
