@@ -200,7 +200,7 @@ class option_gridworld:
 
         return states, skills, next_states, rewards
 
-    def aggregate_states(self, K, w, nb_it=100):
+    def aggregate_states(self, K, w, nb_it=500):
         # K : number of clusters
         # w : size of the sliding window
 
@@ -209,7 +209,8 @@ class option_gridworld:
         N = self.env.n_states
         cluster_coord = [ self.env.state2coord[state] for state in np.random.choice(range(N),size=K,replace=False) ]
         clustering = np.zeros(N, dtype=int)
-
+        not_encountered_states = list(range(N))
+            
         for state in range(N):
             coord = np.array(self.env.state2coord[state])
             clustering[state] = np.argmin([np.linalg.norm(coord - cluster_coord[k]) for k in range(K)])
@@ -228,17 +229,21 @@ class option_gridworld:
                 cluster_coord[k] = states_k.sum(axis=0) / float(len(states_k))
 
             # update clustering
-            for state in range(N):
-                if state in traj:
-                    state_idx = np.where(traj==state)[0][0]
-                    ext_state = traj[int(max(state_idx-w, 0)):int(min(state_idx+w+1, len(traj)))]
-                    ext_state_coord = np.array([self.env.state2coord[i] for i in ext_state])
-                    clustering[state] = np.argmin([np.linalg.norm(ext_state_coord-cluster_coord[k]) for k in range(K)])
 
+            for state_idx,state in enumerate(traj): # every-visit MC
+                ext_state = traj[int(max(state_idx-w,0)):int(min(state_idx+w+1,len(traj)))]
+                ext_state_coord = np.array([self.env.state2coord[i] for i in ext_state])
+                clustering[state] = np.argmin([np.linalg.norm(ext_state_coord-cluster_coord[k]) for k in range(K)])
+                if state in not_encountered_states:
+                    not_encountered_states.remove(state)            
+
+        if len(not_encountered_states):
+            print("warning : the following states were not encountered during the state aggregation step : {}".format(not_encountered_states))
+                   
         self.cluster_coord = cluster_coord
         self.clustering = clustering
 
-    def show_clustering(self):
+    def show_clustering(self,print_state=True):
 
         if hasattr(self, 'cluster_coord'):
             dim = 70
@@ -276,6 +281,8 @@ class option_gridworld:
                 r, c = self.env.state2coord[state]
                 x, y = 10 + c * (dim + 4), 10 + r * (dim + 4)
                 self.polygons.append( self.window.create_polygon([x, y, x + dim, y, x + dim, y + dim, x, y + dim], outline='black', fill=cluster_color[cluster_idx], width=2) )
+                if print_state:
+                    self.window.create_text(x + dim / 2., y + dim / 2., text="{}".format(state), font=my_font, fill='white')
 
             self.ovals = []
             for cluster_idx,cluster in enumerate(self.cluster_coord):
@@ -372,9 +379,11 @@ def test_gridmaker():
         ]
 
     terminal_positions = [(0,0), (0, 11), (2, 8), (5, 7)]
-    example = option_gridworld(grid=grid, terminal_positions=terminal_positions)
+    """example = option_gridworld(grid=grid, terminal_positions=terminal_positions)
     example.IOVI(vi_steps=4000, option_updates=70, horizon=15, monitor_performance=None, regularizer=0.)
-    pickle.dump(example, open('goodboy.pkl', 'wb'))
+    pickle.dump(example, open('goodboy.pkl', 'wb'))"""
+    print("Loading goodboy.pkl")
+    example = pickle.load(open('goodboy.pkl','rb'))
     # example.plot_terminations()
 
     return example
