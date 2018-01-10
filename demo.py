@@ -21,7 +21,7 @@ if __name__ == '__main__':
     horizon = 25
     full_grid = \
         [
-            [4., 'x', '', 'x', '', '', 'x', '', '', '', '', 1],
+            [5., 'x', '', 'x', '', '', 'x', '', '', '', '', 5.],
             ['', 'x', '', '', '', '', 'x', '', '', '', '', ''],
             ['', 'x', '', 'x', '', '', 'x', 'x', 'x', 'x', 'x', ''],
             ['', '', '', 'x', '', '', '', '', '', '', 'x', ''],
@@ -32,10 +32,12 @@ if __name__ == '__main__':
             ['', '', 1, '', '', 'x', '', '', '', '', '', ''],
         ]
     
+
     # example = src.option_iteration.trainer(full_grid, dump_name='full_grid_4', horizon=horizon, iovi_iters=4000,
     #                                        option_updates=30, epsilon=0., monitor=5000, noise=0.)
     example = pickle.load(open('saves/full_grid_4_verygoodboy.pkl', 'rb'))
     example.aggregate_states(K=5,w=3)
+
     example.show_clustering()
     example.infer_transitions()
     
