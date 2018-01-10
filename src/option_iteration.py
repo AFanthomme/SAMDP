@@ -15,6 +15,7 @@ import pickle, pdb
 from tkinter import Tk
 import tkinter.font as tkfont
 import numbers
+import threading
 
 def gridmaker(grid, terminal_positions):
     env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0, noise=0.1)
@@ -90,7 +91,12 @@ class option_gridworld:
                     alpha_k = alpha(initiating_state, previous_option)
                     q_estimate[initiating_state, previous_option] = (1. - alpha_k) * q_estimate[
                         initiating_state, previous_option] + alpha_k * \
-                        (skill_reward + env.gamma * np.max(q_estimate[next_state, :]))
+                        (skill_reward + env.gamma * np.max(q_estimate[state, :]))
+                    # I had forgotten that part which make the estimate fo the terminal states non-zero...
+                    nb_encounters[state, skill] += 1
+                    alpha_k = alpha(state, skill)
+                    q_estimate[state, skill] = (1. - alpha_k) * q_estimate[state, skill] + \
+                                               alpha_k * (skill_reward + env.gamma * np.max(q_estimate[next_state, :]))
 
                 elif previous_option != skill:
                     nb_encounters[initiating_state, previous_option] += 1
