@@ -93,7 +93,7 @@ class GridWorld:
         return next_state, reward - self.time_penalty, absorb
 
     def show(self, state, action, next_state, reward):
-        dim = 80
+        dim = 70
         rows, cols = len(self.grid) + 0.5, max(map(len, self.grid))
         if not hasattr(self, 'window'):
             root = Tk()

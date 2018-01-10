@@ -34,7 +34,7 @@ def gridmaker(grid, terminal_positions):
     return options_mdp
 
 class option_gridworld:
-    def __init__(self, grid=None, env=None, terminal_states=None, terminal_positions=None):
+    def __init__(self, grid=None, env=None, terminal_states=None, terminal_positions=None, noise=0.):
         self.terminal_states = terminal_states
 
         if grid is None:
@@ -42,7 +42,7 @@ class option_gridworld:
                 raise RuntimeError('Please provide either a grid or a Gridworld environment')
             self.env = env
         else:
-            self.env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0, noise=0.1)
+            self.env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0, noise=noise)
 
         self.n_states = self.env.n_states
         # Default options are going straight in one direction, can be started anywhere and never terminate.
@@ -76,14 +76,14 @@ class option_gridworld:
         alpha = lambda state, action: 1. / nb_encounters[state, action]
 
         for epoch in range(n_epochs):
-            states, skills, next_states, rewards = self.generate_trajectory(T=ep_length, noise=epsilon)
+            states, skills, next_states, rewards = self.generate_trajectory(T=ep_length, noise=epsilon, resetting=True)
             idx, skill_reward = 0, 0
 
             for state, skill, next_state, reward in zip(states, skills, next_states, rewards):
                 if idx == 0:
                     previous_option = skill
-
                     initiating_state = state
+
                 elif idx == len(states) - 1:
                     skill_reward += reward
                     nb_encounters[initiating_state, previous_option] += 1
@@ -95,8 +95,13 @@ class option_gridworld:
                 elif previous_option != skill:
                     nb_encounters[initiating_state, previous_option] += 1
                     alpha_k = alpha(initiating_state, previous_option)
-                    q_estimate[initiating_state, previous_option] = (1. - alpha_k) * q_estimate[initiating_state, previous_option] + alpha_k * \
-                                            (skill_reward + env.gamma * np.max(q_estimate[next_state, :]))
+                    q_estimate[initiating_state, previous_option] = (1. - alpha_k) * \
+                                            q_estimate[initiating_state, previous_option] + alpha_k * \
+                                            (skill_reward + env.gamma * np.max(q_estimate[state, :]))
+
+                    # state or next_state ???
+                    #
+                    #
                     previous_option = skill
                     skill_reward = reward
                     initiating_state = state
@@ -164,13 +169,18 @@ class option_gridworld:
         except ValueError:
             raise RuntimeError('No actions possible in state {}'.format(state))
 
-    def generate_trajectory(self, T=30, noise=0.):
+    def generate_trajectory(self, T=30, noise=0., resetting=False):
         env = self.env
         state = env.reset()
 
-        # Trajectories that directly land on a terminal state are not very useful
+        # Depending on resetting, accept or not the trajectories that start on a terminal state
+
         while state in self.terminal_states:
-            state = env.reset()
+            if not resetting:
+                i, j = env.state2coord[state]
+                return np.array([state]), np.array([np.random.randint(4)]), np.array([state]), np.array([env.grid[i][j]])
+            else:
+                state = env.reset()
 
         skill_in_use = self.choose_skill(state)
         termination_probs = self.options[skill_in_use]['term']
@@ -188,10 +198,18 @@ class option_gridworld:
             state = nextstate
 
             if term:
-                next_states = next_states[:t+1]
-                states = states[:t+1]
-                rewards = rewards[:t+1]
-                skills = skills[:t+1]
+                try:
+                    next_states[t+1] = state
+                    states[t+1] = state
+                    rewards[t+1] = 0
+                    skills[t+1] = skill_in_use
+                except IndexError:
+                    t-=1
+
+                next_states = next_states[:t+2]
+                states = states[:t+2]
+                rewards = rewards[:t+2]
+                skills = skills[:t+2]
                 break
             elif np.random.rand() < termination_probs[state] or np.random.rand() < noise:
                 # With probability termination_probs[state], interrupt option and choose a new one
@@ -301,94 +319,11 @@ class option_gridworld:
         else:
             print("Error : first run method 'aggregate_states' to compute clustering")        
 
-def test_triovi():
-    grid = \
-        [
-            ['', '', '', 1],
-            ['', 'x', '', -1],
-            ['', '', '', '']
-        ]
-    env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0)
-    example = option_gridworld(env, terminal_states=[3, 6])
 
-    # Remove from inits states where a certain action cannot be initiated
-    example.options[0]['init'] = np.delete(example.options[0]['init'], [3, 4, 6, 10])
-    example.options[1]['init'] = np.delete(example.options[1]['init'], [1, 3, 6, 7, 8, 9, 10])
-    example.options[2]['init'] = np.delete(example.options[2]['init'], [0, 3, 4, 6, 5, 7])
-    example.options[3]['init'] = np.delete(example.options[3]['init'], [0, 1, 2, 3, 6, 8])
-
-    # Add termination probabilities of 1 for states where a certain action is forbidden
-    example.options[0]['term'][[3, 4, 6, 10]] = 1.
-    example.options[1]['term'][[1, 3, 6, 7, 8, 9, 10]] = 1.
-    example.options[2]['term'][[0, 3, 4, 6, 5, 7]] = 1.
-    example.options[3]['term'][[0, 1, 2, 3, 6, 8]] = 1.
-
-    example.IOVI(vi_steps=50, option_updates=40, monitor_performance=100, regularizer=0.95)
-    # example.plot_terminations()
-    example.env.render = True
-    for _ in range(5):
-        example.generate_trajectory()
-
-def test_true_grid():
-    grid = \
-        [
-            ['', '', '', -1, 'x', 1, 'x'],
-            ['', '', 'x', 'x', '', '', ''],
-            ['', '', '', '', '', 'x', ''],
-            [1, 'x', '', '', '', '', ''],
-        ]
-    env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0, noise=0.1)
-    example = option_gridworld(env, terminal_states=[3, 4, 16])
-
-    # Remove from inits states where a certain action cannot be initiated
-    example.options[0]['init'] = np.delete(example.options[0]['init'], [3, 4, 6, 9, 14, 15, 16, 21])
-    example.options[1]['init'] = np.delete(example.options[1]['init'], [2, 3, 4, 8, 11, 16, 17, 18, 19, 20, 21])
-    example.options[2]['init'] = np.delete(example.options[2]['init'], [0, 3, 4, 5, 7, 10, 15, 16, 17])
-    example.options[3]['init'] = np.delete(example.options[3]['init'], [0, 1, 2, 3, 4, 7, 9, 12, 13, 16, 20])
-
-    # Add termination probabilities of 1 for states where a certain action is forbidden
-    example.options[0]['term'][[3, 4, 6, 9, 14, 15, 16, 21]] = 1.
-    example.options[1]['term'][[2, 3, 4, 8, 11, 16, 17, 18, 19, 20, 21]] = 1.
-    example.options[2]['term'][[0, 3, 4, 5, 7, 10, 15, 16, 17]] = 1.
-    example.options[3]['term'][[0, 1, 2, 3, 4, 7, 9, 12, 13, 16, 20]] = 1.
-
-    example.IOVI(vi_steps=4500, option_updates=100, horizon=20, monitor_performance=300, regularizer=0.)
-    pickle.dump(example, open('grid1.pkl', 'wb'))
-    example.plot_terminations()
-    example.env.noise = 0.
-    """example.env.render = True
-    for _ in range(25):
-        example.generate_trajectory()"""
-
+def trainer(grid, dump_name='', iovi_iters=200, option_updates=70, horizon=15, epsilon=0., noise=0., monitor=False):
+    terminal_positions = [(0,0), (0, 11), (8, 2), (5, 7)]
+    example = option_gridworld(grid=grid, terminal_positions=terminal_positions, noise=noise)
+    example.IOVI(vi_steps=iovi_iters, option_updates=option_updates, horizon=horizon, epsilon=epsilon, monitor_performance=monitor)
+    pickle.dump(example, open(dump_name + 'goodboy.pkl', 'wb'))
     return example
 
-
-
-def test_gridmaker():
-    grid = \
-        [
-            [4., 'x', '', 'x', '', '', 'x', '', '', '', '', 1],
-            ['', 'x', '', '', '', '', 'x', '', '', '', '', ''],
-            ['', 'x', '', 'x', '', '', 'x', 'x', 'x', 'x', 'x', ''],
-            ['', '', '', 'x', '', '', '', '', '', '', 'x', ''],
-            ['x', '', 'x', 'x', '', '', '', '', '', '', 'x', ''],
-            ['', 'x', '', '', '', 'x', '', -1, 'x', 'x', 'x', ''],
-            ['', 'x', '', '', '', 'x', '', '', '', '', '', ''],
-            ['', '', '', '', '', '', '', '', '', '', '', ''],
-            ['', '', 1, '', '', 'x', '', '', '', '', '', ''],
-        ]
-
-    terminal_positions = [(0,0), (0, 11), (2, 8), (5, 7)]
-    example = option_gridworld(grid=grid, terminal_positions=terminal_positions)
-    example.IOVI(vi_steps=4000, option_updates=70, horizon=15, monitor_performance=None, regularizer=0.)
-    pickle.dump(example, open('goodboy.pkl', 'wb'))
-    """print("Loading goodboy.pkl")
-    example = pickle.load(open('goodboy.pkl','rb'))"""
-    # example.plot_terminations()
-
-    return example
-
-if __name__ == '__main__':
-    # test_triovi()
-    # test_true_grid()
-    test_gridmaker()
