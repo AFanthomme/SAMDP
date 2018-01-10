@@ -325,7 +325,46 @@ class option_gridworld:
         else:
             print("Error : first run method 'aggregate_states' to compute clustering")        
 
+    def infer_transitions(self, it_nb=5000):
+        """
+        This method infers two quantities:
+        - the SAMDP transition probability matrices given one skill
+        - the agent transition probability matrix
+        """
 
+        if hasattr(self, 'cluster_coord'):
+
+            cluster_nb = len(self.cluster_coord)
+            skill_nb = len(self.options)
+            SAMDP_transitions = np.zeros((skill_nb,cluster_nb,cluster_nb))
+            agent_transitions = np.zeros((cluster_nb,cluster_nb))
+            for it in range(it_nb):
+                traj = self.generate_trajectory(T=100, noise=0.)
+                for t in range(len(traj[0])): # every-visit MC
+                    state, skill, next_state, reward = [traj[i][t] for i in range(4)]
+                    cluster = self.clustering[state]
+                    next_cluster = self.clustering[next_state]
+                    SAMDP_transitions[skill,cluster,next_cluster] += 1
+                    agent_transitions[cluster,next_cluster] += 1
+
+            # normalization
+            for skill in range(skill_nb):
+                for cluster in range(cluster_nb):
+                    SAMDP_sample_nb = SAMDP_transitions[skill,cluster,:].sum()
+                    if SAMDP_sample_nb:
+                        SAMDP_transitions[skill,cluster,:] /= float(SAMDP_sample_nb)
+            for cluster in range(cluster_nb):
+                agent_sample_nb = agent_transitions[cluster,:].sum()
+                if agent_sample_nb:
+                    agent_transitions[cluster,:] /= float(agent_sample_nb)
+
+            self.SAMDP_transitions = SAMDP_transitions
+            self.agent_transitions = agent_transitions
+
+        else:
+            print("Error : first run method 'aggregate_states' to compute clustering")            
+
+            
 def trainer(grid, dump_name='', iovi_iters=200, option_updates=70, horizon=15, epsilon=0., noise=0., monitor=False):
     terminal_positions = [(0,0), (0, 11), (8, 2), (5, 7)]
     example = option_gridworld(grid=grid, terminal_positions=terminal_positions, noise=noise)
