@@ -110,3 +110,20 @@ def render_policy(env, d):
         w.pack()
     w.pack()
     root.mainloop()
+
+def render_non_det_policy(env, policy_array):
+    # policy_array[i] = int or list of int representing possible actions (0 denotes impossible, include all states)
+    root = Tk()
+    w = GUI(root)
+    rows, cols = len(env.grid), max(map(len, env.grid))
+    dim = 60
+    w.config(width=cols * (dim + 12), height=rows * (dim + 12))
+    for s in range(env.n_states):
+        r, c = env.state2coord[s]
+        allowed_actions = policy_array[s]
+
+        draw_square_policy(w, 10 + c * (dim + 4), 10 + r * (dim + 4), dim=dim, pol=allowed_actions,
+                           actions=range(4))
+        w.pack()
+    w.pack()
+    root.mainloop()

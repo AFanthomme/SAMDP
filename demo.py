@@ -13,6 +13,7 @@ import pickle
 def pause():
     programPause = input("Press the <ENTER> key to continue...")
 
+
 if __name__ == '__main__':
     seed = np.random.randint(2**12)
     print('Results obtained with seed = {}'.format(seed))
@@ -21,7 +22,7 @@ if __name__ == '__main__':
     horizon = 25
     full_grid = \
         [
-            [5., 'x', '', 'x', '', '', 'x', '', '', '', '', 5.],
+            [4., 'x', '', 'x', '', '', 'x', '', '', '', '', 1.],
             ['', 'x', '', '', '', '', 'x', '', '', '', '', ''],
             ['', 'x', '', 'x', '', '', 'x', 'x', 'x', 'x', 'x', ''],
             ['', '', '', 'x', '', '', '', '', '', '', 'x', ''],
@@ -31,14 +32,18 @@ if __name__ == '__main__':
             ['', '', '', '', '', '', '', '', '', '', '', ''],
             ['', '', 1, '', '', 'x', '', '', '', '', '', ''],
         ]
-    
 
-    # example = src.option_iteration.trainer(full_grid, dump_name='full_grid_4', horizon=horizon, iovi_iters=4000,
-    #                                        option_updates=30, epsilon=0., monitor=5000, noise=0.)
+
+    # example = src.option_iteration.trainer(full_grid, dump_name='full_grid_4', horizon=horizon, iovi_iters=10000,
+    #                                        option_updates=15, epsilon=0.1, monitor=None, noise=0.)
     example = pickle.load(open('saves/full_grid_4_verygoodboy.pkl', 'rb'))
+    example.render_terminations()
+
+
     example.aggregate_states(K=5,w=3)
 
     example.show_clustering()
+
     example.infer_transitions()
     
     try:

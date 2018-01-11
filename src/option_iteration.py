@@ -96,7 +96,7 @@ class option_gridworld:
                     nb_encounters[state, skill] += 1
                     alpha_k = alpha(state, skill)
                     q_estimate[state, skill] = (1. - alpha_k) * q_estimate[state, skill] + \
-                                               alpha_k * (skill_reward + env.gamma * np.max(q_estimate[next_state, :]))
+                            alpha_k * (skill_reward + env.gamma * np.max(q_estimate[next_state, :]))
 
                 elif previous_option != skill:
                     nb_encounters[initiating_state, previous_option] += 1
@@ -104,10 +104,6 @@ class option_gridworld:
                     q_estimate[initiating_state, previous_option] = (1. - alpha_k) * \
                                             q_estimate[initiating_state, previous_option] + alpha_k * \
                                             (skill_reward + env.gamma * np.max(q_estimate[state, :]))
-
-                    # state or next_state ???
-                    #
-                    #
                     previous_option = skill
                     skill_reward = reward
                     initiating_state = state
@@ -136,6 +132,10 @@ class option_gridworld:
 
 
         for t in range(option_updates):
+            if monitor_performance:
+                performance_record[t] = np.mean([np.sum(self.generate_trajectory(T=horizon)[3]) for
+                                                 _ in range(monitor_performance)])
+
             if t%(option_updates//10) == 0:
                 print('{}% done'.format((100.*t)//option_updates))
             # Since we do not have access to the real transition probabilities, we use the Q-learning procedure from TD1
@@ -146,9 +146,6 @@ class option_gridworld:
                 option['term'] = np.maximum(initial_options[idx]['term'],
                                         (current_Q[:, idx] < np.max(current_Q, axis=1) - regularizer * alpha[idx, :]).astype(float))
                 alpha[idx, :] = option['term'] < 1
-
-            if monitor_performance:
-                performance_record[t] = np.mean([np.sum(self.generate_trajectory(T=20)[3]) for _ in range(monitor_performance)])
 
         if monitor_performance:
             p.plot(performance_record)
@@ -165,6 +162,11 @@ class option_gridworld:
                               align='center')
             axarr[option].set_title('Option {} : always go {}'.format(option, names[option]))
         p.show()
+
+    def render_terminations(self):
+        policy_array = [[1. - self.options[option]['term'][state] for option in range(4)]
+                         for state in range(self.n_states)]
+        gui.render_non_det_policy(self.env, np.array(policy_array, dtype=int))
 
 
     def choose_skill(self, state):
@@ -295,16 +297,20 @@ class option_gridworld:
 
             my_font = tkfont.Font(family="Arial", size=32, weight="bold")
 
-            cluster_color = []
-            r = lambda: np.random.randint(0,255)
-            for cluster_idx in range(len(self.cluster_coord)):
-                cluster_color.append('#%02X%02X%02X' % (r(),r(),r()))
+            # cluster_color = []
+            # r = lambda: np.random.randint(0,255)
+            # for cluster_idx in range(len(self.cluster_coord)):
+            #     cluster_color.append('#%02X%02X%02X' % (r(),r(),r()))
+
+            # Use fixed color cycle for more reproducibility
+            cluster_color = ['red', 'green', 'blue', 'yellow', 'cyan', 'magenta', 'white', 'black']
 
             self.polygons = []
             for state, cluster_idx in enumerate(self.clustering):
                 r, c = self.env.state2coord[state]
                 x, y = 10 + c * (dim + 4), 10 + r * (dim + 4)
-                self.polygons.append( self.window.create_polygon([x, y, x + dim, y, x + dim, y + dim, x, y + dim], outline='black', fill=cluster_color[cluster_idx], width=2) )
+                self.polygons.append( self.window.create_polygon([x, y, x + dim, y, x + dim, y + dim, x, y + dim],
+                                                        outline='black', fill=cluster_color[cluster_idx], width=2) )
                 if print_state:
                     self.window.create_text(x + dim / 2., y + dim / 2., text="{}".format(state), font=my_font, fill='white')
 
@@ -312,7 +318,8 @@ class option_gridworld:
             for cluster_idx,cluster in enumerate(self.cluster_coord):
                 r1, c1 = 10 + cluster[1] * (dim + 4), 10 + cluster[0] * (dim + 4)
                 x1, y1 = r1 + dim / 2., c1 + dim / 2.
-                self.ovals.append( self.window.create_oval(x1 - dim / 5., y1 - dim / 5., x1 + dim / 5., y1 + dim / 5., fill=cluster_color[cluster_idx]) )
+                self.ovals.append( self.window.create_oval(x1 - dim / 5., y1 - dim / 5., x1 + dim / 5., y1 + dim / 5.,
+                                                           fill=cluster_color[cluster_idx]) )
 
             for oval in self.ovals:
                 if hasattr(self, str(oval)):
@@ -365,10 +372,12 @@ class option_gridworld:
             print("Error : first run method 'aggregate_states' to compute clustering")            
 
             
-def trainer(grid, dump_name='', iovi_iters=200, option_updates=70, horizon=15, epsilon=0., noise=0., monitor=False):
-    terminal_positions = [(0,0), (0, 11), (8, 2), (5, 7)]
+def trainer(grid, dump_name=None, iovi_iters=200, option_updates=70, horizon=15, epsilon=0., noise=0., monitor=False,
+    terminal_positions = [(0, 0), (0, 11), (8, 2), (5, 7)]):
+
     example = option_gridworld(grid=grid, terminal_positions=terminal_positions, noise=noise)
     example.IOVI(vi_steps=iovi_iters, option_updates=option_updates, horizon=horizon, epsilon=epsilon, monitor_performance=monitor)
-    pickle.dump(example, open(dump_name + 'goodboy.pkl', 'wb'))
+    if dump_name is not None:
+        pickle.dump(example, open(dump_name + 'goodboy.pkl', 'wb'))
     return example
 
