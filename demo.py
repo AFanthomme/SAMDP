@@ -35,7 +35,7 @@ if __name__ == '__main__':
 
 
     # example = src.option_iteration.trainer(full_grid, dump_name='full_grid_4', horizon=horizon, iovi_iters=10000,
-    #                                        option_updates=15, epsilon=0.1, monitor=None, noise=0.)
+    #                                        option_updates=15, epsilon=0.1, monitor=1000, noise=0.)
     example = pickle.load(open('saves/full_grid_4_verygoodboy.pkl', 'rb'))
     example.render_terminations()
 

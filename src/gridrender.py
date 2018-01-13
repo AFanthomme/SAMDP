@@ -49,7 +49,7 @@ def draw_square_q(polygon, x, y, q, actions, dim=50):
             polygon.create_text(x + dim / 2., y + dim / 4., font=font, text="{:.3f}".format(q[i]), anchor='s')
 
 
-def draw_square_policy(w, x, y, pol, actions, dim=30):
+def draw_square_policy(w, x, y, pol, actions, dim=30, width=1):
     w.create_polygon([x, y, x + dim, y, x + dim, y + dim, x, y + dim], outline='black',
                      fill='white', width=2)
 
@@ -65,19 +65,23 @@ def draw_square_policy(w, x, y, pol, actions, dim=30):
         if j < len(actions):
             a = actions[j]
             if a == 0 and v > 0:
-                w.create_line(x + dim / 2., y + dim / 2., x + 3*dim / 4., y + dim / 2., tags=("line",), arrow="last")
+                w.create_line(x + dim / 4., y + dim / 2., x + 3*dim / 4., y + dim / 2., tags=("line",), arrow="last",
+                              width=width)
                 if not np.isclose(v, 1.):
                     w.create_text(x + 3*dim / 4., y + dim / 2., font=font, text="{:.1f}".format(v), anchor='w')
             elif a == 1 and v > 0:
-                w.create_line(x + dim / 2., y + dim / 2., x + dim / 2., y + 3* dim / 4., tags=("line",), arrow="last")
+                w.create_line(x + dim / 2., y + dim / 4., x + dim / 2., y + 3* dim / 4., tags=("line",), arrow="last",
+                              width=width)
                 if not np.isclose(v, 1.):
                     w.create_text(x + dim / 2., y + 3*dim / 4., font=font, text="{:.1f}".format(v), anchor='n')
             elif a == 2 and v >0:
-                w.create_line(x + dim / 2., y + dim / 2., x+dim/4., y + dim/2., tags=("line",), arrow="last")
+                w.create_line(x + 3 *dim / 4., y + dim / 2., x+dim/4., y + dim/2., tags=("line",), arrow="last",
+                              width=width)
                 if not np.isclose(v, 1.):
                     w.create_text(x + dim / 4., y + dim / 2., font=font, text="{:.1f}".format(v), anchor='e')
             elif a == 3 and v >0:
-                w.create_line(x + dim / 2., y + dim / 2., x + dim / 2., y + dim / 4., tags=("line",), arrow="last")
+                w.create_line(x + dim / 2., y + 3 *dim / 4., x + dim / 2., y + dim / 4., tags=("line",), arrow="last",
+                              width=width)
                 if not np.isclose(v, 1.):
                     w.create_text(x + dim / 2., y + dim / 4., font=font, text="{:.1f}".format(v), anchor='s')
 
@@ -123,7 +127,7 @@ def render_non_det_policy(env, policy_array):
         allowed_actions = policy_array[s]
 
         draw_square_policy(w, 10 + c * (dim + 4), 10 + r * (dim + 4), dim=dim, pol=allowed_actions,
-                           actions=range(4))
+                           actions=range(4), width=3)
         w.pack()
     w.pack()
     root.mainloop()

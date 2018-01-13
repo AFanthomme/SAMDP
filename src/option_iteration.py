@@ -114,7 +114,7 @@ class option_gridworld:
         return q_estimate
 
 
-    def IOVI(self, vi_steps=100, option_updates=100, regularizer=0.95, horizon=30, monitor_performance=None, epsilon=0.):
+    def IOVI(self, vi_steps=100, option_updates=100, horizon=30, monitor_performance=None, epsilon=0.):
         """
         Use the IOVI procedure to train skills by interrrupting the initial options.
 
@@ -144,8 +144,7 @@ class option_gridworld:
 
             for idx, option in enumerate(current_options):
                 option['term'] = np.maximum(initial_options[idx]['term'],
-                                        (current_Q[:, idx] < np.max(current_Q, axis=1) - regularizer * alpha[idx, :]).astype(float))
-                alpha[idx, :] = option['term'] < 1
+                                (current_Q[:, idx] < np.max(current_Q, axis=1)).astype(float))
 
         if monitor_performance:
             p.plot(performance_record)
@@ -376,7 +375,8 @@ def trainer(grid, dump_name=None, iovi_iters=200, option_updates=70, horizon=15,
     terminal_positions = [(0, 0), (0, 11), (8, 2), (5, 7)]):
 
     example = option_gridworld(grid=grid, terminal_positions=terminal_positions, noise=noise)
-    example.IOVI(vi_steps=iovi_iters, option_updates=option_updates, horizon=horizon, epsilon=epsilon, monitor_performance=monitor)
+    example.IOVI(vi_steps=iovi_iters, option_updates=option_updates, horizon=horizon, epsilon=epsilon,
+                 monitor_performance=monitor)
     if dump_name is not None:
         pickle.dump(example, open(dump_name + 'goodboy.pkl', 'wb'))
     return example
