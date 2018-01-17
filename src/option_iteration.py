@@ -15,7 +15,10 @@ import pickle, pdb
 from tkinter import Tk
 import tkinter.font as tkfont
 import numbers
-import threading
+import warnings
+import tqdm
+
+warnings.filterwarnings('ignore')
 
 def gridmaker(grid, terminal_positions):
     env = GridWorld(grid=grid, gamma=0.95, time_penalty=0.0, noise=0.1)
@@ -64,6 +67,9 @@ class option_gridworld:
 
         for action in range(4):
             self.options[action]['term'][problematic_states[action]] = 1.
+
+        self.clustering = None
+        self.cluster_coord = None
 
     def q_estimation(self, n_epochs=100, T=30, epsilon=0., seed=None):
         env = self.env
@@ -131,13 +137,11 @@ class option_gridworld:
         alpha = np.ones((self.n_options, self.n_states))
 
 
-        for t in range(option_updates):
+        for t in tqdm.trange(option_updates, leave=False):
             if monitor_performance:
                 performance_record[t] = np.mean([np.sum(self.generate_trajectory(T=horizon)[3]) for
                                                  _ in range(monitor_performance)])
 
-            if t%(option_updates//10) == 0:
-                print('{}% done'.format((100.*t)//option_updates))
             # Since we do not have access to the real transition probabilities, we use the Q-learning procedure from TD1
             # instead of VI to obtain the new Q function.
             current_Q = self.q_estimation(n_epochs=vi_steps, T=horizon, epsilon=epsilon)
@@ -254,7 +258,6 @@ class option_gridworld:
                 cluster_coord[k] = states_k.sum(axis=0) / float(len(states_k))
 
             # update clustering
-
             for state_idx,state in enumerate(traj): # every-visit MC
                 ext_state = traj[int(max(state_idx-w,0)):int(min(state_idx+w+1,len(traj)))]
                 ext_state_coord = np.array([self.env.state2coord[i] for i in ext_state])
@@ -271,7 +274,7 @@ class option_gridworld:
     def show_clustering(self,print_state=True):
 
         if hasattr(self, 'cluster_coord'):
-            dim = 70
+            dim = 50
             rows, cols = len(self.env.grid) + 0.5, max(map(len, self.env.grid))
             if hasattr(self, 'window'):
                 del(self.window)
@@ -338,20 +341,30 @@ class option_gridworld:
         - the agent transition probability matrix
         """
 
-        if hasattr(self, 'cluster_coord'):
+        if not(self.clustering is None or self.cluster_coord is None):
 
             cluster_nb = len(self.cluster_coord)
             skill_nb = len(self.options)
             SAMDP_transitions = np.zeros((skill_nb,cluster_nb,cluster_nb))
             agent_transitions = np.zeros((cluster_nb,cluster_nb))
+            # Add a skill / micro-states agnostic procedure
+            corrected_transitions = np.zeros((cluster_nb,cluster_nb))
+
             for it in range(it_nb):
                 traj = self.generate_trajectory(T=100, noise=0.)
                 for t in range(len(traj[0])): # every-visit MC
                     state, skill, next_state, reward = [traj[i][t] for i in range(4)]
+
                     cluster = self.clustering[state]
                     next_cluster = self.clustering[next_state]
                     SAMDP_transitions[skill,cluster,next_cluster] += 1
                     agent_transitions[cluster,next_cluster] += 1
+
+                    if cluster != next_cluster:
+                        corrected_transitions[cluster, next_cluster] +=1
+                    elif t==len(traj[0])-1:
+                        corrected_transitions[cluster, cluster] += 1
+
 
             # normalization
             for skill in range(skill_nb):
@@ -359,13 +372,26 @@ class option_gridworld:
                     SAMDP_sample_nb = SAMDP_transitions[skill,cluster,:].sum()
                     if SAMDP_sample_nb:
                         SAMDP_transitions[skill,cluster,:] /= float(SAMDP_sample_nb)
+
+            # Compute exit probabilities
+            exits = np.diag(corrected_transitions)
+            self.exit_fractions = exits / np.sum(exits)
+
+            # Normalize corrected transitions
+            for cluster in range(cluster_nb):
+                # Non-diagonal terms : fraction of trajectories starting from
+                corrected_sample_nb = corrected_transitions[cluster, :].sum()
+                corrected_transitions[cluster, :] /= float(corrected_sample_nb)
+
             for cluster in range(cluster_nb):
                 agent_sample_nb = agent_transitions[cluster,:].sum()
                 if agent_sample_nb:
                     agent_transitions[cluster,:] /= float(agent_sample_nb)
 
             self.SAMDP_transitions = SAMDP_transitions
+            self.corrected_transitions = corrected_transitions
             self.agent_transitions = agent_transitions
+
 
         else:
             print("Error : first run method 'aggregate_states' to compute clustering")            
