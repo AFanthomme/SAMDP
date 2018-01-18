@@ -1,5 +1,5 @@
-import src.option_iteration
-from src.gridworld import GridWorld
+import option_iteration
+from gridworld import GridWorld
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
@@ -38,7 +38,7 @@ def study_transition_probabilities(n_repeats=2, n_points=15):
                 [rw, '', '', 'x', 'x', 'x', '', '', rw],
             ]
 
-            example = src.option_iteration.trainer(symetric_grid, dump_name=None, horizon=horizon, iovi_iters=4000,
+            example = option_iteration.trainer(symetric_grid, dump_name=None, horizon=horizon, iovi_iters=4000,
                         option_updates=15, epsilon=0.2, monitor=None, noise=0., terminal_positions=terminal_positions)
 
             try:
@@ -110,7 +110,7 @@ def show_clustering():
         [rw, '', '', 'x', 'x', 'x', '', '', rw],
     ]
 
-    example = src.option_iteration.trainer(symetric_grid, dump_name=None, horizon=horizon, iovi_iters=4,
+    example = option_iteration.trainer(symetric_grid, dump_name=None, horizon=horizon, iovi_iters=4,
                                            option_updates=1, epsilon=0.2, monitor=None, noise=0.,
                                            terminal_positions=terminal_positions)
     plop = np.loadtxt('sym_grid_clusters.txt', dtype=int)
@@ -121,5 +121,5 @@ def show_clustering():
     time.sleep(100)
 
 if __name__ == '__main__':
-    study_transition_probabilities(n_repeats=150, n_points=25)
+    study_transition_probabilities(n_repeats=100, n_points=20)
     # show_clustering()

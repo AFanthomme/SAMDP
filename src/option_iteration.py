@@ -7,9 +7,9 @@ Implementation : Arnaud Fanthomme and Antoine Goblet
 '''
 
 import numpy as np
-from src.gridworld import GridWorld
+from gridworld import GridWorld
 import matplotlib.pyplot as p
-import src.gridrender as gui
+import gridrender as gui
 from copy import deepcopy
 import pickle, pdb
 from tkinter import Tk
@@ -355,9 +355,9 @@ class option_gridworld:
                 for t in range(len(traj[0])): # every-visit MC
                     state, skill, next_state, reward = [traj[i][t] for i in range(4)]
 
-                    cluster = self.clustering[state]
-                    next_cluster = self.clustering[next_state]
-                    SAMDP_transitions[skill,cluster,next_cluster] += 1
+                    cluster = int(self.clustering[state])
+                    next_cluster = int(self.clustering[next_state])
+                    SAMDP_transitions[int(skill),cluster,next_cluster] += 1
                     agent_transitions[cluster,next_cluster] += 1
 
                     if cluster != next_cluster:
