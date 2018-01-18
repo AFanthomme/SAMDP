@@ -6,13 +6,13 @@ import pickle
 import tqdm
 import time
 
-def study_transition_probabilities(n_repeats=2):
+def study_transition_probabilities(n_repeats=2, n_points=15):
     seed = np.random.randint(2**12)
     print('Results obtained with seed = {}'.format(seed))
     np.random.seed(seed)
 
     terminal_positions = [(8, 8), (0, 4), (8, 0)]
-    rewards_range = np.linspace(0.3, 3., 15)
+    rewards_range = np.linspace(0.3, 3., n_points)
     # rewards_range = [1.8]
     horizon = 25
     transitions = np.zeros((len(rewards_range), 3, 3))
@@ -21,7 +21,7 @@ def study_transition_probabilities(n_repeats=2):
     var_transitions = np.zeros((len(rewards_range), 3, 3))
     var_exits = np.zeros((len(rewards_range), 3))
 
-    for idx, rw in enumerate(tqdm.tqdm(rewards_range)):
+    for idx, rw in enumerate(tqdm.tqdm(rewards_range, leave=False)):
         tmp_transitions = np.zeros((n_repeats, 3, 3))
         tmp_exits = np.zeros((n_repeats, 3))
 
@@ -121,5 +121,5 @@ def show_clustering():
     time.sleep(100)
 
 if __name__ == '__main__':
-    study_transition_probabilities(n_repeats=50)
+    study_transition_probabilities(n_repeats=150, n_points=25)
     # show_clustering()
